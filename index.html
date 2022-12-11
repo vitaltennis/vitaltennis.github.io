@@ -1,0 +1,699 @@
+
+<style>
+/* наша HTML таблица */
+table.sort{
+	border-spacing:0.1em;
+	margin-bottom:1em;
+	margin-top:1em
+}
+/* ячейки таблицы */
+table.sort td{
+	border:1px solid #CCCCCC;
+	padding:0.3em 1em
+}
+/* заголовки таблицы */
+table.sort thead td{
+	cursor:pointer;
+	font-weight:bold;
+	text-align:center;
+	vertical-align:middle
+}
+/* заголовок отсортированного столбца */
+table.sort thead td.curcol{
+	background-color:#999999;
+	color:#FFFFFF
+}
+</style>
+
+<script>
+/*
+originally written by paul sowden <paul@idontsmoke.co.uk> | http://idontsmoke.co.uk
+modified and localized by alexander shurkayev <alshur@narod.ru> | http://htmlcoder.visions.ru
+last modification 06.12.2009 by KDG http://htmlweb.ru/
+*/
+
+initial_sort_id = 0; // номер начального отсортированного столбца, начиная с нуля
+initial_sort_up = 1; // 0 - сортировка вниз, 1 - вверх
+var sort_case_sensitive = false; // чуствительновть к регистру при сотрировке
+function _sort(a, b) {
+	var a = a[0];
+	var b = b[0];
+	var _a = (a + '').replace(/,/, '.');
+	var _b = (b + '').replace(/,/, '.');
+	if (parseInt(_a) && parseInt(_b)) return sort_numbers(parseInt(_a), parseInt(_b));
+	else if (!sort_case_sensitive) return sort_insensitive(a, b);
+	else return sort_sensitive(a, b);
+}
+function sort_numbers(a, b) {
+	return a - b;
+}
+function sort_insensitive(a, b) {
+	var anew = a.toLowerCase();
+	var bnew = b.toLowerCase();
+	if (anew < bnew) return -1;
+	if (anew > bnew) return 1;
+	return 0;
+}
+function sort_sensitive(a, b) {
+	if (a < b) return -1;
+	if (a > b) return 1;
+	return 0;
+}
+function getConcatenedTextContent(node) {
+	var _result = "";
+	if (node == null) {
+		return _result;
+	}
+	var childrens = node.childNodes;
+	var i = 0;
+	while (i < childrens.length) {
+		var child = childrens.item(i);
+		switch (child.nodeType) {
+			case 1: // ELEMENT_NODE
+			case 5: // ENTITY_REFERENCE_NODE
+				_result += getConcatenedTextContent(child);
+				break;
+			case 3: // TEXT_NODE
+			case 2: // ATTRIBUTE_NODE
+			case 4: // CDATA_SECTION_NODE
+				_result += child.nodeValue;
+				break;
+			case 6: // ENTITY_NODE
+			case 7: // PROCESSING_INSTRUCTION_NODE
+			case 8: // COMMENT_NODE
+			case 9: // DOCUMENT_NODE
+			case 10: // DOCUMENT_TYPE_NODE
+			case 11: // DOCUMENT_FRAGMENT_NODE
+			case 12: // NOTATION_NODE
+			// skip
+			break;
+		}
+		i++;
+	}
+	return _result;
+}
+function sort(e) {
+	var el = window.event ? window.event.srcElement : e.currentTarget;
+
+	while (el.tagName.toLowerCase() != "td") el = el.parentNode;
+
+	var a = new Array();
+	var name = el.lastChild.nodeValue;
+	var dad = el.parentNode;
+	var table = dad.parentNode.parentNode;
+	var up = table.up; // no set/getAttribute!
+
+	var node, arrow, curcol;
+	for (var i = 0; (node = dad.getElementsByTagName("td").item(i)); i++) {
+		if (node.lastChild.nodeValue == name){
+			curcol = i;
+			if (node.className == "curcol"){
+				arrow = node.firstChild;
+				table.up = Number(!up);
+			}else{
+				node.className = "curcol";
+				arrow = node.insertBefore(document.createElement("span"),node.firstChild);
+			        arrow.appendChild(document.createTextNode(""));
+				table.up = 0;
+			}
+			arrow.innerHTML=((table.up==0)?"&#8595;":"&#8593;")+"&nbsp;";
+		}else{
+			if (node.className == "curcol"){
+				node.className = "";
+				if (node.firstChild) node.removeChild(node.firstChild);
+			}
+		}
+	}
+	var tbody = table.getElementsByTagName("tbody").item(0);
+	for (var i = 0; (node = tbody.getElementsByTagName("tr").item(i)); i++) {
+		a[i] = new Array();
+		a[i][0] = getConcatenedTextContent(node.getElementsByTagName("td").item(curcol));
+		a[i][1] = getConcatenedTextContent(node.getElementsByTagName("td").item(1));
+		a[i][2] = getConcatenedTextContent(node.getElementsByTagName("td").item(0));
+		a[i][3] = node;
+	}
+	a.sort(_sort);
+	if (table.up) a.reverse();
+	for (var i = 0; i < a.length; i++) {
+		tbody.appendChild(a[i][3]);
+	}
+}
+function init(e) {
+	if (!document.getElementsByTagName) return;
+
+	if (document.createEvent) function click_elem(elem){
+		var evt = document.createEvent("MouseEvents");
+		evt.initMouseEvent("click", false, false, window, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, elem);
+		elem.dispatchEvent(evt);
+	}
+
+	for (var j = 0; (thead = document.getElementsByTagName("thead").item(j)); j++) {
+		var node;
+		for (var i = 0; (node = thead.getElementsByTagName("td").item(i)); i++) {
+			if (node.addEventListener) node.addEventListener("click", sort, false);
+			else if (node.attachEvent) node.attachEvent("onclick", sort);
+			node.title = "Нажмите на заголовок, чтобы отсортировать колонку";
+		}
+		thead.parentNode.up = 0;
+
+		if (typeof(initial_sort_id) != "undefined"){
+			td_for_event = thead.getElementsByTagName("td").item(initial_sort_id);
+			if (td_for_event.dispatchEvent) click_elem(td_for_event);
+			else if (td_for_event.fireEvent) td_for_event.fireEvent("onclick");
+			if (typeof(initial_sort_up) != "undefined" && initial_sort_up){
+				if (td_for_event.dispatchEvent) click_elem(td_for_event);
+				else if (td_for_event.fireEvent) td_for_event.fireEvent("onclick");
+			}
+		}
+	}
+}
+var root = window.addEventListener || window.attachEvent ? window : document.addEventListener ? document : null;
+if (root){
+	if (root.addEventListener) root.addEventListener("load", init, false);
+	else if (root.attachEvent) root.attachEvent("onload", init);
+}
+</script>
+
+<!-- В заголовках всех сортрируемых таблиц нужно указать class="sort"
+кроме этого необходимо заголовок таблицы заключить в <thead>, тело в <tbody> -->
+
+<table class="sort">
+<thead>
+<tr>
+<td>ID</td> <!---->
+<td>Название</td>
+<td>Вес</td>
+<td>Голова</td>
+<td>Баланс</td>
+<td>Ручка</td>
+<td>Cross</td>
+<td>Main</td>
+<td>Swingweight</td>
+<td>Жесткость</td>
+<td>Обод верх</td>
+<td>Об. пятно</td>
+<td>Об. вилка</td>
+<td>Длина</td>
+<td>Натяжка от</td>
+<td>Н-ка до</td>
+<td>Чехол</td>
+<td>Состояние</td>
+<td>Цена</td>
+<td>Комментарии</td>
+</tr>
+</thead>
+
+<tbody>
+	
+<tr>
+<td>1</td> <!--ID-->
+<td>Babolat Classic 1 Ti Reinforced</td><!--Название-->
+<td>285</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>325</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>23</td><!--Обод верх-->
+<td>23</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>50</td><!--Натяжка-->
+<td>55</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>65</td><!--Состояние-->
+<td></td><!--Цена-->
+<td>износ струны 20% , желтая моно, р.28х32 без гл.грипа</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>2</td> <!--ID-->
+<td>Babolat Classic Lite Ti</td><!--Название-->
+<td>280</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>333</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>23</td><!--Обод-->
+<td>23</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>50</td><!--Натяжка-->
+<td>55</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td></td><!--Цена-->
+<td>износ струны 20%, серая моно</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>3</td> <!--ID-->
+<td>Babolat Pure Drive Junior 26 Andy Rodick</td><!--Название-->
+<td>250</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>330</td><!--Баланс-->
+<td>0</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>23</td><!--Обод-->
+<td>26</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>26</td><!--Длина-->
+<td>50</td><!--Натяжка-->
+<td>55</td><!--Натяжка до-->	
+<td>0</td><!--Чехол-->
+<td>70</td><!--Состояние-->
+<td>5000</td><!--Цена-->
+<td>Родная струна, износ 30%</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>4</td> <!--ID-->
+<td>Babolat Pure Drive Lite</td><!--Название-->
+<td>275</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>320</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>24</td><!--Обод-->
+<td>26</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>62</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>70</td><!--Состояние-->
+<td></td><!--Цена-->
+<td>струна Babolat на исходе</td><!--Комментарии-->
+</tr>
+
+	
+<tr>
+<td>5</td> <!--ID-->
+<td>Babolat Reflex 109</td><!--Название-->
+<td>260</td><!--Вес-->
+<td>109</td><!--Голова-->
+<td>350</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>25</td><!--Обод-->
+<td>25</td><!--Об. пятно-->
+<td>25</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td></td><!--Натяжка-->
+<td></td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>100</td><!--Состояние-->
+<td></td><!--Цена-->
+<td>родная струна, ручка 30,5/33,5 в сечении, основной грип толстый, power shaft</td><!--Комментарии-->
+</tr>
+	
+
+<tr>
+<td>6</td> <!--ID-->
+<td>Donnay Agassi Pro</td><!--Название-->
+<td>340</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>310</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>25</td><!--Обод-->
+<td>25</td><!--Об. пятно-->
+<td>25</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>60</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>70</td><!--Состояние-->
+<td></td><!--Цена-->
+<td>стр.Pacific Nyltec на исходе, р.28х34 без гл.грипа</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>7</td> <!--ID-->
+<td>Donnay Pro One</td><!--Название-->
+<td>323</td><!--Вес-->
+<td>106</td><!--Голова-->
+<td>322</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>19</td><!--Обод-->
+<td>19</td><!--Об. пятно-->
+<td>19</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>67</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td></td><!--Цена-->
+<td></td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>8</td> <!--ID-->
+<td>Dunlop 400g</td><!--Название-->
+<td>294</td><!--Вес-->
+<td>100</td><!--Голова-->
+<td>305</td><!--Баланс-->
+<td>3</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td>285</td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>24</td><!--Обод-->
+<td>24</td><!--Об. пятно-->
+<td>24</td><!--Об. вилка-->
+<td>27,25</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td>5000</td><!--Цена-->
+<td>вес увеличен гелем в ручку на 13г, china, tt14301</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>9</td> <!--ID-->
+<td>Dunlop lady G</td><!--Название-->
+<td>276</td><!--Вес-->
+<td>108</td><!--Голова-->
+<td>315</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>27</td><!--Обод-->
+<td>27</td><!--Об. пятно-->
+<td>27</td><!--Об. вилка-->
+<td>27,44</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>70</td><!--Состояние-->
+<td>3000</td><!--Цена-->
+<td>вес увеличен на 39г гелем в ручку, есть родной чехол-рюкзак, ручка 29x33.5, длина 697мм, свежая струна head</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>10</td> <!--ID-->
+<td>Dunlop McEnroe Limited</td><!--Название-->
+<td>340</td><!--Вес-->
+<td>85</td><!--Голова-->
+<td>316</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>18</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>19</td><!--Обод-->
+<td>20</td><!--Об. пятно-->
+<td>21</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td></td><!--Натяжка-->
+<td></td><!--Натяжка до-->
+<td></td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td>3800</td><!--Цена-->
+<td>новая желтая моно струна 09.22 babolat Hurricane 1.3,  taiwan, < 85? </td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>11</td> <!--ID-->
+<td>Dunlop tour revelation MP</td><!--Название-->
+<td>309</td><!--Вес-->
+<td>98</td><!--Голова-->
+<td>332</td><!--Баланс-->
+<td>3</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>18</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>25</td><!--Обод-->
+<td>27</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td></td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td>7200</td><!--Цена-->
+<td>techline, ISIS, premium graphite, midplus (98?),</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>12</td> <!--ID-->
+<td>Fisher GDS Take Off 910</td><!--Название-->
+<td>236</td><!--Вес-->
+<td>112</td><!--Голова-->
+<td>365</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>25</td><!--Обод-->
+<td>27</td><!--Об. пятно-->
+<td>26</td><!--Об. вилка-->
+<td>27,5</td><!--Длина-->
+<td>45</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td></td><!--Чехол-->
+<td>95</td><!--Состояние-->
+<td>5700</td><!--Цена-->
+<td>air carbon ti</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>13</td> <!--ID-->
+<td>Head AMF Graphite Edge</td><!--Название-->
+<td>343</td><!--Вес-->
+<td>81</td><!--Голова-->
+<td>327</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>18</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>20</td><!--Обод-->
+<td>20</td><!--Об. пятно-->
+<td>20</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td></td><!--Натяжка-->
+<td></td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>75</td><!--Состояние-->
+<td>4200</td><!--Цена-->
+<td>на вилке выбит номер 3022, made in usa</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>14</td> <!--ID-->
+<td>Head comp tour pro series</td><!--Название-->
+<td>336</td><!--Вес-->
+<td>90</td><!--Голова-->
+<td>307</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>18</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>20</td><!--Обод-->
+<td>20</td><!--Об. пятно-->
+<td>20</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>80</td><!--Состояние-->
+<td>4800</td><!--Цена-->
+<td>fiberglass/composite, made in austria,  выбит номер на вилке 077</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>15</td> <!--ID-->
+<td>Head i.x5 intelligence MP</td><!--Название-->
+<td>270</td><!--Вес-->
+<td>102</td><!--Голова-->
+<td>350</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td>302</td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>24</td><!--Обод-->
+<td>24</td><!--Об. пятно-->
+<td>24</td><!--Об. вилка-->
+<td>27,5</td><!--Длина-->
+<td>54</td><!--Натяжка-->
+<td>64</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>90</td><!--Состояние-->
+<td>5200</td><!--Цена-->
+<td>swing style s5, made in Austria, ser 7180446, ручка 36/31 овал</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>16</td> <!--ID-->
+<td>Head Polaris 660</td><!--Название-->
+<td>337</td><!--Вес-->
+<td>102</td><!--Голова-->
+<td>310</td><!--Баланс-->
+<td>3</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>31</td><!--Обод-->
+<td>25</td><!--Об. пятно-->
+<td>29</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>63</td><!--Натяжка-->
+<td>74</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>85</td><!--Состояние-->
+<td>3000</td><!--Цена-->
+<td>длина?, баланс и ручка примерно</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>17</td> <!--ID-->
+<td>Head tour 600</td><!--Название-->
+<td>336</td><!--Вес-->
+<td>93</td><!--Голова-->
+<td>303</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>18</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>24</td><!--Обод-->
+<td>24</td><!--Об. пятно-->
+<td>24</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td></td><!--Натяжка-->
+<td></td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>90</td><!--Состояние-->
+<td>7000</td><!--Цена-->
+<td>новая желтая моно струна Babolat Hurricane 1.3 (09.22), ручка овал, один ГРИП тонкий 35/29 = #3,  malaysia</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>18</td> <!--ID-->
+<td>Prince AirO Synergy Ti</td><!--Название-->
+<td>283</td><!--Вес-->
+<td>110</td><!--Голова-->
+<td>320</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>23</td><!--Обод-->
+<td>23</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>50</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td>0</td><!--Чехол-->
+<td>90</td><!--Состояние-->
+<td>5000</td><!--Цена-->
+<td>родная струна с лого</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>19</td> <!--ID-->
+<td>Prince Extender Lighting 730PL</td><!--Название-->
+<td>283</td><!--Вес-->
+<td>104</td><!--Голова-->
+<td>350</td><!--Баланс-->
+<td>4</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>21</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>26</td><!--Обод-->
+<td>25</td><!--Об. пятно-->
+<td>23</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>50</td><!--Натяжка-->
+<td>65</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>90</td><!--Состояние-->
+<td>5000</td><!--Цена-->
+<td>износ струны PrinceSynt.Gut 20%</td><!--Комментарии-->
+</tr>
+	
+<tr>
+<td>20</td> <!--ID-->
+<td>Prince Graphite Pro LX Oversize</td><!--Название-->
+<td>335</td><!--Вес-->
+<td>110</td><!--Голова-->
+<td>305</td><!--Баланс-->
+<td>2</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>19</td>
+<td></td><!--Swingweight-->
+<td></td><!--Жесткость-->
+<td>25</td><!--Обод-->
+<td>25</td><!--Об. пятно-->
+<td>25</td><!--Об. вилка-->
+<td>27</td><!--Длина-->
+<td>55</td><!--Натяжка-->
+<td>70</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>85</td><!--Состояние-->
+<td>4500</td><!--Цена-->
+<td>голова и вес уточнить</td><!--Комментарии-->
+</tr>
+
+<tr>
+<td>21</td> <!--ID-->
+<td>Prince Precision 690 Longbody</td><!--Название-->
+<td>317</td><!--Вес-->
+<td>95</td><!--Голова-->
+<td>310</td><!--Баланс-->
+<td>5</td><!--Ручка-->
+<td>16</td><!--Стр. формула-->
+<td>20</td>
+<td></td><!--Swingweight-->
+<td>65</td><!--Жесткость-->
+<td>20</td><!--Обод-->
+<td>20</td><!--Об. пятно-->
+<td>20</td><!--Об. вилка-->
+<td>28</td><!--Длина-->
+<td>57</td><!--Натяжка-->
+<td>67</td><!--Натяжка до-->
+<td>1</td><!--Чехол-->
+<td>80</td><!--Состояние-->
+<td>7500</td><!--Цена-->
+<td>711cm Майкл Чанг 690 - power level </td><!--Комментарии-->
+</tr>
+	
+	
+</tbody>
+
+</table>
+
+
+
